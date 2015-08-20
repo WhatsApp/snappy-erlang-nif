@@ -135,13 +135,23 @@ BEGIN_C
 
 
 ERL_NIF_TERM
-snappy_compress(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+snappy_compress_erl(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     ErlNifBinary input;
 
     if(!enif_inspect_iolist_as_binary(env, argv[0], &input)) {
         return enif_make_badarg(env);
     }
+
+    // If empty binary has been provided, return an empty binary.
+    // Snappy will do this in any case, so might as well skip the
+    // overhead...
+    if(input.size == 0) {
+        ErlNifBinary empty;
+        // init empty;
+        memset(&empty,0,sizeof(ErlNifBinary));
+        return make_ok(env, enif_make_binary(env,&empty));
+     }
 
     try {
         snappy::ByteArraySource source(SC_PTR(input.data), input.size);
@@ -157,7 +167,7 @@ snappy_compress(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
 
 ERL_NIF_TERM
-snappy_decompress(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+snappy_decompress_erl(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     ErlNifBinary bin;
     ErlNifBinary ret;
@@ -165,6 +175,15 @@ snappy_decompress(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     if(!enif_inspect_iolist_as_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
+    }
+
+    // Check that the binary is not empty
+    if(bin.size == 0) {
+        // Snappy library cannot decompress an empty binary - although
+        // it will unfortunately let you compress one. If an empty binary
+        // has been passed - send an empty binary back.
+        memset(&ret,0,sizeof(ErlNifBinary));
+        return make_ok(env, enif_make_binary(env,&ret));
     }
 
     try {
@@ -189,7 +208,7 @@ snappy_decompress(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
 
 ERL_NIF_TERM
-snappy_uncompressed_length(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+snappy_uncompressed_length_erl(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     ErlNifBinary bin;
     size_t len;
@@ -252,9 +271,9 @@ on_upgrade(ErlNifEnv* env, void** priv, void** old_priv, ERL_NIF_TERM info)
 
 
 static ErlNifFunc nif_functions[] = {
-    {"compress", 1, snappy_compress},
-    {"decompress", 1, snappy_decompress},
-    {"uncompressed_length", 1, snappy_uncompressed_length},
+    {"compress", 1, snappy_compress_erl},
+    {"decompress", 1, snappy_decompress_erl},
+    {"uncompressed_length", 1, snappy_uncompressed_length_erl},
     {"is_valid", 1, snappy_is_valid}
 };
 
